@@ -1,6 +1,8 @@
 pragma solidity ^0.6.0;
 
 interface IOracle {
+    function token0() external returns (address);
+    function token1() external returns (address);
     function update() external;
 
     function consult(address token, uint256 amountIn)

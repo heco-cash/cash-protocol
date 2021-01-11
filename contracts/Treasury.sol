@@ -15,6 +15,10 @@ import './owner/Operator.sol';
 import './utils/Epoch.sol';
 import './utils/ContractGuard.sol';
 
+interface IERC20Decimals {
+    function decimals() external pure returns (uint256);
+}
+
 /**
  * @title Basis Cash Treasury contract
  * @notice Monetary policy logic to adjust supplies of basis cash assets
@@ -49,6 +53,7 @@ contract Treasury is ContractGuard, Epoch {
     uint256 public bondDepletionFloor;
     uint256 private accumulatedSeigniorage = 0;
     uint256 public fundAllocationRate = 10; // %
+    uint256 public cashMateDecimals = 18;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -142,7 +147,15 @@ contract Treasury is ContractGuard, Epoch {
         } else {
             cashPriceOne = _getCashPrice(bondOracle);
         }
-        
+
+        address mateToken = IOracle(bondOracle).token1();
+        if(mateToken == cash) {
+            mateToken = IOracle(bondOracle).token0();
+        }
+        if(mateToken != address(0)) {
+            cashMateDecimals = IERC20Decimals(mateToken).decimals();
+        }
+
         cashPriceCeiling = uint256(105).mul(cashPriceOne).div(10**2);
         bondDepletionFloor = uint256(1000).mul(cashPriceOne);
 
@@ -276,7 +289,7 @@ contract Treasury is ContractGuard, Epoch {
             accumulatedSeigniorage
         );
         uint256 percentage = cashPrice.sub(cashPriceOne);
-        uint256 seigniorage = cashSupply.mul(percentage).div(1e18);
+        uint256 seigniorage = cashSupply.mul(percentage).div(10 ** cashMateDecimals);
         IBasisAsset(cash).mint(address(this), seigniorage);
         accumulatedSeigniorage = accumulatedSeigniorage.add(seigniorage);
         emit TreasuryFunded(now, seigniorage);
